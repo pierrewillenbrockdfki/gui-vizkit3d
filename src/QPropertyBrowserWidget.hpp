@@ -1,9 +1,18 @@
 #ifndef QPROPERTYBROWSERWIDGET_HPP
 #define QPROPERTYBROWSERWIDGET_HPP
 
+//for QT_VERSION
+#include <QObject>
+
+#if QT_VERSION < 0x050000
 #include "qtpropertybrowser/qttreepropertybrowser.h"
 #include "qtpropertybrowser/qtvariantproperty.h"
 #include "qtpropertybrowser/qtpropertymanager.h"
+#else
+#include <qttreepropertybrowser.h>
+#include <qtvariantproperty.h>
+#include <qtpropertymanager.h>
+#endif
 
 #include <QWidget>
 #include <QHash>
@@ -19,6 +28,10 @@ public:
     void addProperties(QObject* obj,QObject* parent = NULL);
     void removeProperties(QObject* obj);
     void addGlobalProperties(QObject* obj, const QStringList &property_list);
+#if QT_VERSION >= 0x050000
+    void disableProperty(QObject* obj);
+    void enableProperty(QObject* obj);
+#endif
     
 protected slots:
     void propertyChangedInGUI(QtProperty *property, const QVariant &val);

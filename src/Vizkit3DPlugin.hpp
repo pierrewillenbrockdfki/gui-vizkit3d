@@ -12,6 +12,10 @@
 #include <vector>
 #include <functional>
 
+#if QT_VERSION >= 0x050000
+class QDockWidget;
+#endif
+
 namespace osgviz 
 {
     class Object;
@@ -306,6 +310,11 @@ class VizPluginBase : public QObject
         QString vizkit3d_plugin_name;
         VizPluginRubyAdapterCollection adapterCollection;
 
+        /** Returns an invalid QVariant
+         * used to invalidate properties
+         */
+        QVariant _invalidate() const;
+
     private:
 	std::vector<std::function<void(float, float, float)>> pickCallbacks;
       
@@ -467,6 +476,7 @@ class VizkitPluginFactory : public QObject
     VizPluginRubyAdapterCommon(pluginName, dataType, methodName, methodName)
 
 
+#if QT_VERSION < 0x050000
 /**
  * Macro that exports a Vizkit3D plugin so that it can be dynamically loaded by vizkit3d
  * 
@@ -502,6 +512,7 @@ class VizkitPluginFactory : public QObject
         };\
     };\
     Q_EXPORT_PLUGIN2(QtPlugin##pluginName, QtPlugin##pluginName)
+#endif
 
 /** @deprecated adapter item for legacy visualizations. Do not derive from this
  * class for new designs. Use VizPlugin directly instead.
@@ -539,4 +550,11 @@ class VizPluginAdapter : public Vizkit3DPlugin<T>
 };
 
 }
+
+#if QT_VERSION >= 0x050000
+#define VizkitPluginFactory_iid "rock.vizkit3d.VizkitPluginFactory"
+
+Q_DECLARE_INTERFACE(vizkit3d::VizkitPluginFactory, VizkitPluginFactory_iid)
+#endif
+
 #endif

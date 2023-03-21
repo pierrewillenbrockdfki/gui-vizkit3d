@@ -3,7 +3,11 @@
 
 #include "Vizkit3DPlugin.hpp"
 
+#if QT_VERSION < 0x050000
 #include <QtDesigner/QDesignerExportWidget>
+#else
+#include <QtUiPlugin/QDesignerExportWidget>
+#endif
 #include <QVector3D>
 #include <QTimer>
 #include <QMainWindow>
@@ -415,6 +419,10 @@ namespace vizkit3d
              *  3d view.*/
             void frameSelected(const QString frame);
 
+        protected:
+	    void hideEvent(QHideEvent *ev);
+	    void showEvent(QShowEvent *ev);
+
         private slots:
             void setPluginDataFrameIntern(const QString &frame, QObject *plugin);
             void addPluginIntern(QObject* plugin,QObject *parent=NULL);
@@ -446,8 +454,14 @@ namespace vizkit3d
 
             
             osgviz::OsgViz* osgviz;
+#if QT_VERSION < 0x050000
             osgviz::Window* window;
-
+            osgViewer::View *view;
+#else
+            osgViewer::CompositeViewer* window;
+            osg::ref_ptr<osgviz::SuperView> view;
+            osg::ref_ptr<osg::Group> window_root;
+#endif
 
         private:
             //holds the scene
@@ -464,7 +478,11 @@ namespace vizkit3d
              */
             struct VizPluginInfo {
                 osg::ref_ptr<osg::Group> osg_group_ptr;
+#if QT_VERSION < 0x050000
                 QWeakPointer<VizPluginBase> weak_ptr;
+#else
+                VizPluginBase* weak_ptr;
+#endif
                 
                 VizPluginInfo(VizPluginBase* plugin_ptr_, osg::ref_ptr<osg::Group> osg_group_ptr_)
                   : osg_group_ptr(osg_group_ptr_),
@@ -476,6 +494,8 @@ namespace vizkit3d
             PluginMap plugins;
 
             QTimer _timer;
+	    /** Holds the timer state while the window is hidden */
+	    bool timerRunning;
 
             /** The current visualization frame as set by setVisualizationFrame */
             QString current_frame;

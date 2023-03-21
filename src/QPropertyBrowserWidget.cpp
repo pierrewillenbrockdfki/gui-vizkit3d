@@ -30,7 +30,13 @@ void QPropertyBrowserWidget::addGlobalProperties(QObject* obj, const QStringList
     
     for(int i = 1 ; i < metaObj->propertyCount(); i++)
     {
+#if QT_VERSION < 0x050000
         if(property_list.contains(QString::fromAscii(metaObj->property(i).name())))
+#else
+        if(!metaObj->property(i).isDesignable())
+            continue;
+        if(property_list.contains(QString::fromLocal8Bit(metaObj->property(i).name())))
+#endif
         {
             QtVariantProperty* property = variantManager->addProperty(metaObj->property(i).type(), metaObj->property(i).name());
             if(property == 0)
@@ -71,10 +77,26 @@ void QPropertyBrowserWidget::addProperties(QObject* obj,QObject* parent)
     
     // genarate group entry and all variant properties
     QList<QtVariantProperty*> properties;
+
+#if QT_VERSION >= 0x050000
+    //retrieve and add dynamic properties
+    QList<QByteArray> dynamicProperties = obj->dynamicPropertyNames();
+    for (auto dp : dynamicProperties){
+        QVariant val = obj->property(dp.toStdString().c_str());
+        QtVariantProperty* property =variantManager->addProperty(val.type(), QString(dp.toStdString().c_str()));
+        property->setValue(val);
+        properties.push_back(property);
+    }
+#endif
+
     for(int i = 1 ; i < metaObj->propertyCount(); i++)
     {
         QMetaProperty prop = metaObj->property(i);
+#if QT_VERSION < 0x050000
         if(!prop.isValid())
+#else
+        if(!prop.isValid() || !prop.isDesignable())
+#endif
             continue;
         
         QVariant var = obj->property(prop.name());
@@ -91,6 +113,12 @@ void QPropertyBrowserWidget::addProperties(QObject* obj,QObject* parent)
         if(prop.type() == QVariant::StringList)
         {
             QtVariantProperty* property = variantManager->addProperty(QtVariantPropertyManager::enumTypeId(),prop.name());
+            if(property == 0)
+            {
+                std::cerr << "QVariant type " << metaObj->property(i).type() << " with name " << metaObj->property(i).name() 
+                    << " is not supported by the QtPropertyBrowser." << std::endl;
+                continue;
+            }
             property->setAttribute("enumNames", var);
             properties.push_back(property);
             continue;
@@ -159,6 +187,24 @@ void QPropertyBrowserWidget::propObjDestroyed(QObject *delObj) {
     //std::cout << "Object destroyed: " << delObj << std::endl;
     removeProperties(delObj);
 }
+
+#if QT_VERSION >= 0x050000
+void QPropertyBrowserWidget::enableProperty(QObject* obj){
+    // Get property
+    if(objectToGroup[obj])
+    {
+        objectToGroup[obj]->setEnabled(true);
+    }
+}
+
+void QPropertyBrowserWidget::disableProperty(QObject* obj){
+    // Get property
+    if(objectToGroup[obj])
+    {
+        objectToGroup[obj]->setEnabled(false);
+    }
+}
+#endif
 
 /**
  * Removes all properies of a QObject from the property browser widget.
