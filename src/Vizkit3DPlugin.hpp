@@ -477,9 +477,72 @@ class VizkitPluginFactory : public QObject
 
 
 #if QT_VERSION < 0x050000
+#define VizkitQtPluginCLASSDEFS
+#define VizkitQtPluginEXTRADEFS Q_EXPORT_PLUGIN2(QtPlugin##pluginName, QtPlugin##pluginName)
+#else
+#define VizkitQtPluginCLASSDEFS Q_PLUGIN_METADATA(IID "rock.vizkit3d.VizkitPluginFactory")
+#define VizkitQtPluginEXTRADEFS
+#endif
+
 /**
- * Macro that exports a Vizkit3D plugin so that it can be dynamically loaded by vizkit3d
- * 
+ * Macros that export a Vizkit3D plugin so that it can be dynamically loaded by vizkit3d
+ *
+ * Example:
+ *
+ * Header:
+ * <code>
+ *     class WaypointVisualization : public vizkit3d::Vizkit3DPlugin {..};
+ *     VizkitQtPluginHeaderDecls(WaypointVisualization)
+ * </code>
+ *
+ * Source:
+ * <code>
+ *     VizkitQtPluginImpl(WaypointVisualization)
+ * </code>
+ *
+ * This works if your shared library exports only one plugin. To export multiple
+ * plugins, you need to create a subclass of vizkit3d::VizkitPluginFactory which
+ * handles the plugins.
+ * For Qt4, you have to export it with
+ * <code>
+ * Q_EXPORT_PLUGIN2(FactoryClass, FactoryClass)
+ * </code>
+ * For Qt5, you have to add to the class definition in a header
+ * <code>
+ * Q_PLUGIN_METADATA(IID "rock.vizkit3d.VizkitPluginFactory")
+ * </code>
+ */
+#define VizkitQtPluginHeaderDecls(pluginName)\
+    class QtPlugin##pluginName : public vizkit3d::VizkitPluginFactory {\
+        Q_OBJECT \
+        VizkitQtPluginCLASSDEFS \
+    public:\
+        virtual QStringList* getAvailablePlugins() const; \
+        virtual QObject* createPlugin(QString const& name);\
+    };\
+
+/** @copydoc VizkitQtPluginHeaderDecls */
+#define VizkitQtPluginImpl(pluginName)\
+    QStringList* QtPlugin##pluginName::getAvailablePlugins() const\
+    {\
+        QStringList* result = new QStringList; \
+        result->push_back(#pluginName); \
+        return result;\
+    } \
+    QObject* QtPlugin##pluginName::createPlugin(QString const& name)\
+    {\
+        if (name == #pluginName) \
+            return new pluginName;\
+        else return 0;\
+    }\
+    VizkitQtPluginEXTRADEFS
+
+#if QT_VERSION < 0x050000
+/**
+ * @deprecated Macro that exports a Vizkit3D plugin so that it can be dynamically loaded by vizkit3d
+ *
+ * Replace with VizkitQtPluginHeaderDecls(pluginName) and VizkitQtPluginImpl(pluginName)
+ *
  * Example:
  *
  * <code>
@@ -489,14 +552,17 @@ class VizkitPluginFactory : public QObject
  *
  * This works if your shared library exports only one plugin. To export multiple
  * plugins, you need to create a subclass of vizkit3d::VizkitPluginFactory which
- * handles the plugins, and export it with
- *
+ * handles the plugins:
  * <code>
  * Q_EXPORT_PLUGIN2(FactoryClass, FactoryClass)
  * </code>
  */
+//TODO check if we instead can just do VizkitQtPluginHeaderDecls(pluginName) and VizkitQtPluginImpl(pluginName)
+//since this is qt4, this never was parsed by the moc(the qt4 one does not resolve macros), so it should work in
+//either header or source file.
 #define VizkitQtPlugin(pluginName)\
     class QtPlugin##pluginName : public vizkit3d::VizkitPluginFactory {\
+        Q_OBJECT \
         public:\
         virtual QStringList* getAvailablePlugins() const\
         {\
