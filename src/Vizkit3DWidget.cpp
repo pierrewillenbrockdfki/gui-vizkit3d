@@ -307,12 +307,10 @@ Vizkit3DWidget::Vizkit3DWidget(QWidget* parent,const QString &world_name,bool au
     camera->setCullMask(~INVISIBLE_NODE_MASK);
     camera->setComputeNearFarMode(osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR);
 
-#if QT_VERSION < 0x050000
     osg::Vec3 lookAtPos(0,0,0);
     osg::Vec3 eyePos(-4,-4,4);
     osg::Vec3 upVector(0,0,1);
     changeCameraView(&lookAtPos, &eyePos, &upVector);
-#endif
 
     //connect signals and slots
     connect(this, SIGNAL(addPlugins(QObject*,QObject*)), this, SLOT(addPluginIntern(QObject*,QObject*)));
