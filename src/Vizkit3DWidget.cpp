@@ -1113,7 +1113,11 @@ QStringList* Vizkit3DWidget::getAvailablePlugins()
     QStringList *plugins_str_list = new QStringList;
 
     QStringList name_filters;
+#if QT_VERSION < 0x050000
     name_filters << "lib*-viz.so" << "lib*-viz.dylib" << "lib*-viz.dll";
+#else
+    name_filters << "lib*-viz-qt5.so" << "lib*-viz-qt5.dylib" << "lib*-viz-qt5.dll";
+#endif
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     QString path_string = env.value("VIZKIT_PLUGIN_RUBY_PATH","/usr/local/lib:/usr/lib");
