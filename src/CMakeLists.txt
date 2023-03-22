@@ -2,13 +2,7 @@
 rock_find_qt4(OPTIONAL QtOpenGL)
 rock_find_qt5(OPTIONAL Core OpenGL Widgets UiPlugin)
 
-if (ROCK_QT_VERSION_4)
-include(RockRuby)
-
-QT4_ADD_RESOURCES(PROPERTY_BROWSER_RESOURCES qtpropertybrowser/qtpropertybrowser.qrc)
-
-rock_library(vizkit3d
-    SOURCES
+set(VIZKIT3D_SOURCES
         QtThreadedWidget.cpp
         NodeLink.cpp
         ColorConversionHelper.cpp
@@ -20,22 +14,20 @@ rock_library(vizkit3d
         CoordinateFrame.cpp
         DefaultManipulator.cpp
         EnableGLDebugOperation.cpp
-        ${PROPERTY_BROWSER_RESOURCES} 
-    MOC
-        Vizkit3DPlugin.cpp 
+        Vizkit3DPlugin.cpp
         Vizkit3DWidget.cpp
         QVizkitMainWindow.cpp
-        qtpropertybrowser/qteditorfactory.cpp
-        qtpropertybrowser/qtvariantproperty.cpp
-        qtpropertybrowser/qtpropertymanager.cpp
-        qtpropertybrowser/qtbuttonpropertybrowser.cpp
-        qtpropertybrowser/qtpropertybrowser.cpp
-        qtpropertybrowser/qtpropertybrowserutils.cpp
-        qtpropertybrowser/qttreepropertybrowser.cpp
-        qtpropertybrowser/qtgroupboxpropertybrowser.cpp
         QPropertyBrowserWidget.cpp
-        ${MOC_EXTRA}
-    HEADERS
+)
+
+set(VIZKIT3D_MOC
+        Vizkit3DPlugin.hpp
+        Vizkit3DWidget.hpp
+        QVizkitMainWindow.hpp
+        QPropertyBrowserWidget.hpp
+)
+
+set(VIZKIT3D_HEADERS
         TransformerGraph.hpp
         GridNode.hpp
         TextureBox.hpp
@@ -51,20 +43,65 @@ rock_library(vizkit3d
         CoordinateFrame.hpp
         EnvPluginBase.hpp
         DefaultManipulator.hpp
+)
+
+if (ROCK_QT_VERSION_4)
+include(RockRuby)
+
+QT4_ADD_RESOURCES(PROPERTY_BROWSER_RESOURCES qtpropertybrowser/qtpropertybrowser.qrc)
+
+set(PROPERTY_BROWSER_SOURCES
+        qtpropertybrowser/qteditorfactory.cpp
+        qtpropertybrowser/qtvariantproperty.cpp
+        qtpropertybrowser/qtpropertymanager.cpp
+        qtpropertybrowser/qtbuttonpropertybrowser.cpp
+        qtpropertybrowser/qtpropertybrowser.cpp
+        qtpropertybrowser/qtpropertybrowserutils.cpp
+        qtpropertybrowser/qttreepropertybrowser.cpp
+        qtpropertybrowser/qtgroupboxpropertybrowser.cpp
+)
+
+set(PROPERTY_BROWSER_MOC
+        qtpropertybrowser/qteditorfactory.h
+        qtpropertybrowser/qtvariantproperty.h
+        qtpropertybrowser/qtpropertymanager.h
+        qtpropertybrowser/qtbuttonpropertybrowser.h
+        qtpropertybrowser/qtpropertybrowser.h
+        qtpropertybrowser/qtpropertybrowserutils.h
+        qtpropertybrowser/qttreepropertybrowser.h
+        qtpropertybrowser/qtgroupboxpropertybrowser.h
+)
+
+rock_library(vizkit3d
+    SOURCES
+        ${VIZKIT3D_SOURCES}
+        ${PROPERTY_BROWSER_SOURCES}
+        ${PROPERTY_BROWSER_RESOURCES}
+    MOC
+        ${VIZKIT3D_MOC}
+        ${PROPERTY_BROWSER_MOC}
+        ${MOC_EXTRA}
+    HEADERS
+        ${VIZKIT3D_HEADERS}
         ${HEADERS_EXTRA}
-    LIBS ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY}
+    LIBS ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} Qt4::QtOpenGL
     DEPS_CMAKE OpenGL
     DEPS_PKGCONFIG openscenegraph openscenegraph-osgQt osgViz
                    PrimitivesFactory ManipulationClickHandler ${DEPS_EXTRA})
 
 rock_library(vizkitwidgetloader
-    MOC QVizkitWidgetLoader.cpp
+        QVizkitWidgetLoader.cpp
+    MOC QVizkitWidgetLoader.hpp
     DEPS vizkit3d
     NOINSTALL) # installs in a non-standard location
 #rock_library(vizkitmainwindowloader
 #    MOC QVizkitMainWindowLoader.cpp
 #    DEPS vizkit3d
 #    NOINSTALL) # installs in a non-standard location
+
+install(TARGETS vizkitwidgetloader #vizkitmainwindowloader
+    LIBRARY DESTINATION lib/qt/designer
+    ARCHIVE DESTINATION lib/qt/designer)
 
 endif()
 
@@ -82,41 +119,14 @@ else()
   message(SEND_ERROR "Could not find osgQt or openscenegraph-osgQt5 with pkg-config")
 endif()
 
-rock_library(vizkit3d
+rock_library(vizkit3d-qt5
     SOURCES
-        QtThreadedWidget.cpp
-        NodeLink.cpp
-        ColorConversionHelper.cpp
-        GridNode.cpp
-        TextureBox.cpp
-        AxesNode.cpp
-        OsgVisitors.cpp
-        TransformerGraph.cpp
-        CoordinateFrame.cpp
-        DefaultManipulator.cpp
-        EnableGLDebugOperation.cpp
-        Vizkit3DPlugin.cpp
-        Vizkit3DWidget.cpp
-        QVizkitMainWindow.cpp
-        QPropertyBrowserWidget.cpp
+        ${VIZKIT3D_SOURCES}
+    MOC5
+        ${VIZKIT3D_MOC}
     HEADERS
         QPropertyBrowserWidget.hpp
-
-        TransformerGraph.hpp
-        GridNode.hpp
-        TextureBox.hpp
-        NodeLink.hpp
-        AxesNode.hpp
-        OsgVisitors.hpp
-        QtThreadedWidget.hpp
-        Vizkit3DBase.hpp
-        Vizkit3DPlugin.hpp
-        Vizkit3DWidget.hpp
-        QVizkitMainWindow.hpp
-        ColorConversionHelper.hpp
-        CoordinateFrame.hpp
-        EnvPluginBase.hpp
-        DefaultManipulator.hpp
+        ${VIZKIT3D_HEADERS}
     DEPS_TARGET
 # QtPropertyBrowser properly sets up its target, fails to setup the plain
 # cmake variables(thus cannot be used with DEPS_CMAKE) and does not have a
@@ -139,28 +149,29 @@ rock_library(vizkit3d
         ManipulationClickHandler
 )
 
-rock_library(vizkitwidgetloader
+rock_library(vizkitwidgetloader-qt5
     SOURCES
         QVizkitWidgetLoader.cpp
+    MOC5
+        QVizkitWidgetLoader.hpp
     DEPS
-        vizkit3d
+        vizkit3d-qt5
     NOINSTALL # installs in a non-standard location
 )
 
-rock_library(vizkitmainwindowloader
+rock_library(vizkitmainwindowloader-qt5
     SOURCES
         QVizkitMainWindowLoader.cpp
     DEPS
-        vizkit3d
+        vizkit3d-qt5
     NOINSTALL # installs in a non-standard location
 )
 
-install(TARGETS vizkitmainwindowloader
+#normally, these would go into lib/qt5/plugins/designer, but
+#in rock, we put them in lib/qt/designer as well, since we already
+#have that in QT_PLUGIN_PATH
+install(TARGETS vizkitwidgetloader-qt5 vizkitmainwindowloader-qt5
     LIBRARY DESTINATION lib/qt/designer
     ARCHIVE DESTINATION lib/qt/designer)
 
 endif()
-
-install(TARGETS vizkitwidgetloader #vizkitmainwindowloader
-    LIBRARY DESTINATION lib/qt/designer
-    ARCHIVE DESTINATION lib/qt/designer)

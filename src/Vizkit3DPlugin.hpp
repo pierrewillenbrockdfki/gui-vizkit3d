@@ -478,10 +478,13 @@ class VizkitPluginFactory : public QObject
 
 #if QT_VERSION < 0x050000
 #define VizkitQtPluginCLASSDEFS
-#define VizkitQtPluginEXTRADEFS Q_EXPORT_PLUGIN2(QtPlugin##pluginName, QtPlugin##pluginName)
+#define VizkitQtPluginEXTRADEFS(pluginName) Q_EXPORT_PLUGIN2(QtPlugin##pluginName, QtPlugin##pluginName)
 #else
-#define VizkitQtPluginCLASSDEFS Q_PLUGIN_METADATA(IID "rock.vizkit3d.VizkitPluginFactory")
-#define VizkitQtPluginEXTRADEFS
+//Note: cannot have Q_OBJECT or any qt signal/slots in the VizkitQtPlugin Macro for qt4
+#define VizkitQtPluginCLASSDEFS \
+            Q_OBJECT \
+            Q_PLUGIN_METADATA(IID "rock.vizkit3d.VizkitPluginFactory")
+#define VizkitQtPluginEXTRADEFS(pluginName)
 #endif
 
 /**
@@ -511,15 +514,24 @@ class VizkitPluginFactory : public QObject
  * <code>
  * Q_PLUGIN_METADATA(IID "rock.vizkit3d.VizkitPluginFactory")
  * </code>
+ *
+ * @internal
+ * This is split in two macros because the qt5 moc only looks at headers, and
+ * the Q_PLUGIN_METADATA classes must be moced, while the qt4 Q_EXPORT_PLUGIN2 macro
+ * can only be used once (with the same parameters?) per library, precluding
+ * its use in a header.
+ *
+ * Also of note, the Qt4 side cannot have signals or slots because qt4 moc does not
+ * expand macros.
+ * @endinternal
  */
 #define VizkitQtPluginHeaderDecls(pluginName)\
     class QtPlugin##pluginName : public vizkit3d::VizkitPluginFactory {\
-        Q_OBJECT \
         VizkitQtPluginCLASSDEFS \
     public:\
         virtual QStringList* getAvailablePlugins() const; \
         virtual QObject* createPlugin(QString const& name);\
-    };\
+    };
 
 /** @copydoc VizkitQtPluginHeaderDecls */
 #define VizkitQtPluginImpl(pluginName)\
@@ -535,7 +547,7 @@ class VizkitPluginFactory : public QObject
             return new pluginName;\
         else return 0;\
     }\
-    VizkitQtPluginEXTRADEFS
+    VizkitQtPluginEXTRADEFS(pluginName)
 
 #if QT_VERSION < 0x050000
 /**
@@ -578,6 +590,12 @@ class VizkitPluginFactory : public QObject
         };\
     };\
     Q_EXPORT_PLUGIN2(QtPlugin##pluginName, QtPlugin##pluginName)
+#else
+#define VizkitQtPlugin(pluginName) \
+    static_assert(false, "The VizkitQtPlugin macro is deprecated and " \
+        "does not exist for qt5 use. Use " \
+        "VizkitQtPluginHeaderDecls(" #pluginName ") and " \
+        "VizkitQtPluginImpl(" #pluginName ") instead" )
 #endif
 
 /** @deprecated adapter item for legacy visualizations. Do not derive from this
