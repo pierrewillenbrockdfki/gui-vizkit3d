@@ -18,6 +18,7 @@ set(VIZKIT3D_SOURCES
         Vizkit3DWidget.cpp
         QVizkitMainWindow.cpp
         QPropertyBrowserWidget.cpp
+        ${PROPERTY_BROWSER_RESOURCES}
 )
 
 set(VIZKIT3D_MOC
@@ -43,6 +44,7 @@ set(VIZKIT3D_HEADERS
         CoordinateFrame.hpp
         EnvPluginBase.hpp
         DefaultManipulator.hpp
+        QPropertyBrowserWidget.hpp
 )
 
 if (ROCK_QT_VERSION_4)
@@ -72,6 +74,15 @@ set(PROPERTY_BROWSER_MOC
         qtpropertybrowser/qtgroupboxpropertybrowser.h
 )
 
+set(PROPERTY_BROWSER_HEADERS
+        qtpropertybrowser/qttreepropertybrowser.h
+        qtpropertybrowser/qtpropertybrowser.h
+        qtpropertybrowser/qtvariantproperty.h
+        qtpropertybrowser/qteditorfactory.h
+        qtpropertybrowser/qtpropertymanager.h
+        qtpropertybrowser/qtpropertybrowserutils.h
+)
+
 rock_library(vizkit3d
     SOURCES
         ${VIZKIT3D_SOURCES}
@@ -83,6 +94,7 @@ rock_library(vizkit3d
         ${MOC_EXTRA}
     HEADERS
         ${VIZKIT3D_HEADERS}
+        ${PROPERTY_BROWSER_HEADERS}
         ${HEADERS_EXTRA}
     LIBS ${Boost_THREAD_LIBRARY} ${Boost_SYSTEM_LIBRARY} Qt4::QtOpenGL
     DEPS_CMAKE OpenGL
