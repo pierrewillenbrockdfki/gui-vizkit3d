@@ -7,6 +7,8 @@
 
 #include "Vizkit3DPlugin.hpp"
 #include "Vizkit3DWidget.hpp"
+#include "TransformerGraph.hpp"
+
 
 namespace vizkit3d{
     class ClickHandler : public osgviz::Clickable
@@ -59,17 +61,19 @@ class VizPluginBase::CallbackAdapter : public osg::NodeCallback
 
 VizPluginBase::VizPluginBase(QObject *parent)
     : QObject(parent), oldNodes(NULL), isAttached(false), dirty( false ),  plugin_enabled(true),
-    keep_old_data(false),max_old_data(100)
+    keep_old_data(false),max_old_data(100),minrange(0),maxrange(1000)
 {
     rootNode = new osgviz::Object();
     click_handler = std::shared_ptr<ClickHandler>(new ClickHandler(*this));
     rootNode->addClickableCallback(click_handler);
     nodeCallback = new CallbackAdapter(this);
     rootNode->setUpdateCallback(nodeCallback);
+    lodNode = new osg::LOD();
+    rootNode->addChild(lodNode);
     vizNode = new osg::PositionAttitudeTransform();
-    rootNode->addChild(vizNode);
+    lodNode->addChild(vizNode, minrange, maxrange);
     oldNodes = new osg::Group();
-    rootNode->addChild(oldNodes);
+    lodNode->addChild(oldNodes, minrange, maxrange);
 }
 
 VizPluginBase::~VizPluginBase()
@@ -95,9 +99,42 @@ double VizPluginBase::getScale() const
     return (scale.x()+scale.y()+scale.y())/3;
 }
 
+
+double VizPluginBase::getMinVizRange() const
+{
+    return lodNode->getMinRange(0);
+}
+
+void VizPluginBase::setMinVizRange(double distance) {
+    minrange = distance;
+    // vizNode
+    lodNode->setRange(0, minrange, maxrange);
+    // oldNodes
+    lodNode->setRange(1, minrange, maxrange);
+}
+
+double VizPluginBase::getMaxVizRange() const
+{
+    return lodNode->getMaxRange(0);
+}
+
+void VizPluginBase::setMaxVizRange(double distance)
+{
+    maxrange = distance;
+    // vizNode
+    lodNode->setRange(0, minrange, maxrange);
+    // oldNodes
+    lodNode->setRange(1, minrange, maxrange);
+}
+
 osg::ref_ptr<osg::Group> VizPluginBase::getRootNode() const 
 {
     return rootNode;
+}
+
+osg::ref_ptr<osg::LOD> VizPluginBase::getLODNode() const
+{
+    return lodNode;
 }
 
 void VizPluginBase::click(float x,float y, int buttonMask, int modifierMask)
@@ -315,6 +352,7 @@ void VizPluginBase::setVisualizationFrameFromList(const QStringList &frames)
         return; 
     getWidget()->setPluginDataFrameIntern(frames.front(),this);
     current_frame = frames.front();
+    resetManualVizPose();
 }
 
 QVariant VizPluginBase::_invalidate()const
@@ -329,6 +367,7 @@ void VizPluginBase::setVisualizationFrame(const QString &frame)
     getWidget()->setPluginDataFrameIntern(frame,this);
     current_frame = frame;
     emit propertyChanged("frame");
+    resetManualVizPose();
 }
 
 bool VizPluginBase::getEvaluatesClicks() const{
@@ -339,3 +378,31 @@ void VizPluginBase::setEvaluatesClicks (const bool &value){
     click_handler->enable(value);
 }
 
+void VizPluginBase::setManualVizPoseUpdateEnabled(const bool &newvalue) {
+    if (newvalue == true) {
+        manualVizFrame = getVisualizationFrame().toStdString();
+        setVisualizationFrame("world_osg");
+        updateManualVizPose();
+    } else {
+        setVisualizationFrame(QString(manualVizFrame.c_str()));
+        resetManualVizPose();
+    }
+}
+
+void VizPluginBase::updateManualVizPose() {
+    // save position of this update
+    osg::Vec3d translation;
+    osg::Quat orientation;
+
+    if (TransformerGraph::getTransformation(*(getWidget()->getRootNode()), "world_osg", manualVizFrame, orientation, translation)) {
+        rootNode->setPosition(translation);
+        rootNode->setAttitude(orientation);
+    } else {
+        printf("could not get transform world_osg to %s\n", manualVizFrame.c_str());
+    }
+}
+
+void VizPluginBase::resetManualVizPose() {
+    rootNode->setPosition(osg::Vec3d());
+    rootNode->setAttitude(osg::Quat());
+}

@@ -6,6 +6,7 @@
 
 #include <osg/NodeCallback>
 #include <osg/Group>
+#include <osg/LOD>
 #include <osg/PositionAttitudeTransform>
 
 #include <boost/thread/mutex.hpp>
@@ -131,7 +132,8 @@ class VizPluginBase : public QObject
     Q_PROPERTY(int MaxOldData READ getMaxOldData WRITE setMaxOldData)
     Q_PROPERTY(QStringList frame READ getVisualizationFrames WRITE setVisualizationFrameFromList)
     Q_PROPERTY(double scale READ getScale WRITE setScale)
-
+    Q_PROPERTY(double minVizRange READ getMinVizRange WRITE setMinVizRange)
+    Q_PROPERTY(double maxVizRange READ getMaxVizRange WRITE setMaxVizRange)
 
     public:
         VizPluginBase(QObject *parent=NULL);
@@ -152,6 +154,7 @@ class VizPluginBase : public QObject
                 * plugin's nodes */
         osg::ref_ptr<osg::Group> getVizNode() const;
         osg::ref_ptr<osg::Group> getRootNode() const;
+        osg::ref_ptr<osg::LOD> getLODNode() const;
 
         /**
          * @return a vector of QDockWidgets provided by this class.
@@ -237,6 +240,26 @@ class VizPluginBase : public QObject
         */
         void setScale(double scale);
 
+       /**
+        * Returns the min display range of the plugin
+        */
+        double getMinVizRange() const;
+
+       /**
+        * Sets the min display range of the plugin
+        */
+        void setMinVizRange(double distance);
+
+       /**
+        * Returns the max display range of the plugin
+        */
+        double getMaxVizRange() const;
+
+       /**
+        * Sets the max display range of the plugin
+        */
+        void setMaxVizRange(double distance);
+
         /**
          * @return whether click events should be evaluated by this plugin or not
          */
@@ -310,6 +333,21 @@ class VizPluginBase : public QObject
         QString vizkit3d_plugin_name;
         VizPluginRubyAdapterCollection adapterCollection;
 
+        /** helper function to allow to keep visualization at the position where the data was updated
+         *  plugins using this, need to call updateVizPose() after their data was updated
+         *  the frame that is used to update the position when updateManualVizPose() will be the one that is set
+         *  when calling this function
+         */
+        void setManualVizPoseUpdateEnabled(const bool &newvalue);
+
+        /** use the transformer pose of the visualization frame that was set when setManualVizPoseUpdateEnabled(true) was called
+         * to update the position of the visualization, plugins that set setManualVizPoseUpdateEnabled(true) should
+         * call this function in their updateDataIntern() vinction
+         */
+        void updateManualVizPose();
+
+        void resetManualVizPose();
+
         /** Returns an invalid QVariant
          * used to invalidate properties
          */
@@ -324,6 +362,7 @@ class VizPluginBase : public QObject
 
         osg::ref_ptr<osg::Node> mainNode;               //node which is used by the child class
         osg::ref_ptr<osgviz::Object> rootNode;              //node which is the osg root node of the pluign 
+        osg::ref_ptr<osg::LOD> lodNode;              //node which allows visibility settings for distances from the camera 
         osg::ref_ptr<osg::PositionAttitudeTransform> vizNode; //node which describes the transformation between rootNode and mainNode
         osg::ref_ptr<osg::Group> oldNodes;              //node which is the root node for all old visualization graphs of the plugin  
 
@@ -340,6 +379,8 @@ class VizPluginBase : public QObject
         std::shared_ptr<ClickHandler> click_handler;
         unsigned int max_old_data;
         QString current_frame;
+        std::string manualVizFrame;
+        double minrange, maxrange;
 };
 
 template <typename T> class Vizkit3DPlugin;
