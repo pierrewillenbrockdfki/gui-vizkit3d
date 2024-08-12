@@ -24,6 +24,7 @@
     <depend package="qt5" optional="1" />
     <depend package="qt5-opengl" optional="1" />
     <depend package="gui/osg_qt5" optional="1" />
+    <depend package="gui/osgQOpenGL" optional="1" />
     <depend package="gui/qtpropertybrowser" optional="1" />
     <!-- common dependencies -->
     <depend package="boost" />

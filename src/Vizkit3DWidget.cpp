@@ -27,7 +27,11 @@
 
 #include <osg/PositionAttitudeTransform>
 #include <osgDB/ReadFile>
+#ifndef HAVE_OSGQOPENGL
 #include <osgQt/GraphicsWindowQt>
+#else
+#include <osgQOpenGL/osgQOpenGLWidget>
+#endif
 #include <osgViewer/ViewerEventHandlers>
 #include <osg/CullFace>
 #include <osg/StateAttribute>
@@ -228,6 +232,9 @@ Vizkit3DWidget::Vizkit3DWidget(QWidget* parent,const QString &world_name,bool au
     , env_plugin(NULL), clickHandler(new osgviz::ManipulationClickHandler),
     movedHandler(*this), movingHandler(*this), selectedHandler(*this)
     , timerRunning(auto_update)
+#ifdef HAVE_OSGQOPENGL
+    , openGLWidget(nullptr)
+#endif
 {
     setEnabledManipulators(false);
     clickHandler->objectMoved.connect(movedHandler);
@@ -239,14 +246,59 @@ Vizkit3DWidget::Vizkit3DWidget(QWidget* parent,const QString &world_name,bool au
 
     last_manipulator = vizkit3d::DEFAULT_MANIPULATOR;
 
+#ifndef HAVE_OSGQOPENGL
     graphicsWindowQt = createGraphicsWindow(0,0,800,600);
-    graphicsWindowQtgc = dynamic_cast<osg::GraphicsContext*>(graphicsWindowQt.get());
+    initializeOsg(world_name);
+
+    // create osg widget
+    QWidget* widget = graphicsWindowQt->getGLWidget();
+#else
+    openGLWidget = new osgQOpenGLWidget(this);
+    connect(openGLWidget, &osgQOpenGLWidget::initialized,
+            [this, wn=world_name](){
+                initializeOsg(wn);
+            });
+
+    // create osg widget
+    QWidget* widget = openGLWidget;
+#endif
+
+    widget->setSizePolicy( QSizePolicy( QSizePolicy::Expanding, QSizePolicy::Expanding ) );
+    widget->setObjectName(QString("View Widget"));
+
+    setCentralWidget(widget);
 
 
+    // create propertyBrowserWidget
+    propertyBrowserWidget = new QPropertyBrowserWidget( parent );
+    propertyBrowserWidget->setObjectName("PropertyBrowser");
+    propertyBrowserWidget->setSizePolicy( QSizePolicy( QSizePolicy::Expanding, QSizePolicy::Expanding ) );
+    propertyBrowserWidget->resize(200,600);
+
+    propertyDocker = new QDockWidget("Properties");
+    propertyDocker->setWidget(propertyBrowserWidget);
+    addDockWidget(Qt::RightDockWidgetArea, propertyDocker);
+
+
+    //connect signals and slots
+    connect(this, SIGNAL(addPlugins(QObject*,QObject*)), this, SLOT(addPluginIntern(QObject*,QObject*)));
+    connect(this, SIGNAL(removePlugins(QObject*)), this, SLOT(removePluginIntern(QObject*)));
+    connect( &_timer, SIGNAL(timeout()), this, SLOT(update()) );
+
+}
+
+Vizkit3DWidget::~Vizkit3DWidget() {
+#if QT_VERSION < 0x050000
+    osgviz->destroyWindow(0);
+#endif
+}
+
+void Vizkit3DWidget::initializeOsg(const QString &world_name) {
     osgviz = osgviz::OsgViz::getInstance();
 
-
 #if QT_VERSION < 0x050000
+    osg::ref_ptr<osg::GraphicsContext> graphicsWindowQtgc;
+    graphicsWindowQtgc = dynamic_cast<osg::GraphicsContext*>(graphicsWindowQt.get());
     osgviz::WindowConfig windowConfig;
     windowConfig.width = 800;
     windowConfig.height = 600;
@@ -255,8 +307,12 @@ Vizkit3DWidget::Vizkit3DWidget(QWidget* parent,const QString &world_name,bool au
 
     int osgvizWindowID = osgviz->createWindow(windowConfig,graphicsWindowQtgc);
     window = osgviz->getWindowManager()->getWindowByID(osgvizWindowID);
+    window_root = window->getRootNode();
     view = window->getView(0);
 #else
+#ifndef HAVE_OSGQOPENGL
+    osg::ref_ptr<osg::GraphicsContext> graphicsWindowQtgc;
+    graphicsWindowQtgc = dynamic_cast<osg::GraphicsContext*>(graphicsWindowQt.get());
     int windowid = osgviz->createWindow(osgviz::WindowConfig(), graphicsWindowQtgc);
     osg::ref_ptr<osgviz::Window> osgvizWindow = osgviz->getWindowManager()->getWindowByID(windowid);
     window = dynamic_cast<osgViewer::CompositeViewer*>(osgvizWindow.get());
@@ -265,10 +321,21 @@ Vizkit3DWidget::Vizkit3DWidget(QWidget* parent,const QString &world_name,bool au
     window_root->addChild(NULL);
     window->setName("rock-display");
     view = dynamic_cast<osgviz::SuperView*>(osgvizWindow->addView(osgviz::ViewConfig()));
- 
+
     // set also window scene to the view
     // so all views in the window share the same window scene
     view->addChild(window_root);
+#else
+    window = openGLWidget->getOsgViewer();
+    window_root = new osg::Group();
+    openGLWidget->getOsgViewer()->setSceneData(window_root);
+    window_root->setName("Window root");
+    window_root->addChild(NULL);
+    window->setName("rock-display");
+    osgViewer::Viewer::Views views;
+    window->getViews(views);
+    view = views[0];
+#endif
 
     window_root->addChild(osgviz->getRootNode());
 #endif
@@ -288,29 +355,6 @@ Vizkit3DWidget::Vizkit3DWidget(QWidget* parent,const QString &world_name,bool au
     root = createSceneGraph(world_name);
     osgviz->getRootNode()->addChild(root);
 
-    // create osg widget
-    QWidget* widget = graphicsWindowQt->getGLWidget();
-    widget->setSizePolicy( QSizePolicy( QSizePolicy::Expanding, QSizePolicy::Expanding ) );
-    widget->setObjectName(QString("View Widget"));
-
-    setCentralWidget(widget);
-
-
-    // create propertyBrowserWidget
-    propertyBrowserWidget = new QPropertyBrowserWidget( parent );
-    propertyBrowserWidget->setObjectName("PropertyBrowser");
-    propertyBrowserWidget->setSizePolicy( QSizePolicy( QSizePolicy::Expanding, QSizePolicy::Expanding ) );
-    propertyBrowserWidget->resize(200,600);
-
-    propertyDocker = new QDockWidget("Properties");
-    propertyDocker->setWidget(propertyBrowserWidget);
-    addDockWidget(Qt::RightDockWidgetArea, propertyDocker);
-
-
-    // add config object to the property browser
-    Vizkit3DConfig *config =  new Vizkit3DConfig(this);
-    addProperties(config,NULL);
-
     //setup camera
     osg::Camera* camera = view->getCamera();
     camera->setClearColor(::osg::Vec4(0.2, 0.2, 0.6, 1.0) );
@@ -322,29 +366,21 @@ Vizkit3DWidget::Vizkit3DWidget(QWidget* parent,const QString &world_name,bool au
     // turn off the back culling
     cullFace = new osg::CullFace();
     cullFace->setMode(osg::CullFace::BACK);
-#if QT_VERSION < 0x050000
-    window->getRootNode()->getOrCreateStateSet()->setAttributeAndModes(cullFace, osg::StateAttribute::OFF);
-#else
     window_root->getOrCreateStateSet()->setAttributeAndModes(cullFace, osg::StateAttribute::OFF);
-#endif
 
     osg::Vec3 lookAtPos(0,0,0);
     osg::Vec3 eyePos(-4,-4,4);
     osg::Vec3 upVector(0,0,1);
     changeCameraView(&lookAtPos, &eyePos, &upVector);
 
-    //connect signals and slots
-    connect(this, SIGNAL(addPlugins(QObject*,QObject*)), this, SLOT(addPluginIntern(QObject*,QObject*)));
-    connect(this, SIGNAL(removePlugins(QObject*)), this, SLOT(removePluginIntern(QObject*)));
-    connect( &_timer, SIGNAL(timeout()), this, SLOT(update()) );
-
     current_frame = QString(root->getName().c_str());
-}
 
-Vizkit3DWidget::~Vizkit3DWidget() {
-#if QT_VERSION < 0x050000
-    osgviz->destroyWindow(0);
-#endif
+
+    // add config object to the property browser
+    Vizkit3DConfig *config =  new Vizkit3DConfig(this);
+    addProperties(config,NULL);
+
+    setCameraManipulator(current_manipulator, true);
 }
 
 //qt ruby is crashing if we use none pointer here
@@ -427,6 +463,7 @@ QImage Vizkit3DWidget::grab(unsigned int viewIndex)
 };
 
 
+#ifndef HAVE_OSGQOPENGL
 osgQt::GraphicsWindowQt* Vizkit3DWidget::createGraphicsWindow( int x, int y, int w, int h, const std::string& name, bool windowDecoration)
 {
     ::osg::DisplaySettings* ds = ::osg::DisplaySettings::instance().get();
@@ -444,6 +481,7 @@ osgQt::GraphicsWindowQt* Vizkit3DWidget::createGraphicsWindow( int x, int y, int
     traits->samples = ds->getNumMultiSamples();
     return new osgQt::GraphicsWindowQt(traits.get());
 }
+#endif
 
 void Vizkit3DWidget::update()
 {
@@ -1046,11 +1084,7 @@ void Vizkit3DWidget::setTransformerTextSize(float size)
 
 bool Vizkit3DWidget::isBackCulling() const
 {
-#if QT_VERSION < 0x050000
-    osg::StateSet* stateSet = window->getRootNode()->getStateSet();
-#else
     osg::StateSet* stateSet = window_root->getStateSet();
-#endif
     if (stateSet == NULL)
     {
         return false;
@@ -1068,11 +1102,7 @@ bool Vizkit3DWidget::isBackCulling() const
 
 void Vizkit3DWidget::setBackCulling(bool value)
 {
-#if QT_VERSION < 0x050000
-    osg::StateSet* stateSet = window->getRootNode()->getStateSet();
-#else
     osg::StateSet* stateSet = window_root->getStateSet();
-#endif
     if (value == true) {
         stateSet->setAttributeAndModes(cullFace, osg::StateAttribute::ON);
     } else {
@@ -1201,7 +1231,7 @@ QStringList* Vizkit3DWidget::getAvailablePlugins()
                 for(;iter3 != lib_plugins->end();++iter3)
                     *plugins_str_list << QString(*iter3 + "@" + file_info.absoluteFilePath());
             }
-            catch(std::runtime_error e)
+            catch(std::runtime_error const &e)
             {
                 std::cerr << "WARN: cannot load vizkit plugin library " << e.what() << std::endl;
             }

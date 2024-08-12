@@ -35,7 +35,11 @@
 
 
 namespace osgviz { class ManipulationClickHandler;}
+#ifdef HAVE_OSGQOPENGL
+class osgQOpenGLWidget;
+#else
 namespace osgQt { class GraphicsWindowQt;}
+#endif
 namespace vizkit3d
 {
     class QPropertyBrowserWidget;
@@ -457,7 +461,11 @@ namespace vizkit3d
             void disableDataHandler(VizPluginBase *viz);
             osg::Group *createSceneGraph(const QString &world_name);
 
+#ifndef HAVE_OSGQOPENGL
             osgQt::GraphicsWindowQt* createGraphicsWindow( int x, int y, int w, int h, const std::string& name="", bool windowDecoration=false );
+#endif
+
+            void initializeOsg(const QString &world_name);
 
 
             osgviz::OsgViz* osgviz;
@@ -465,10 +473,15 @@ namespace vizkit3d
             osgviz::Window* window;
             osgViewer::View *view;
 #else
+#ifndef HAVE_OSGQOPENGL
             osgViewer::CompositeViewer* window;
             osg::ref_ptr<osgviz::SuperView> view;
-            osg::ref_ptr<osg::Group> window_root;
+#else
+            osgViewer::Viewer* window;
+            osgViewer::View *view;
 #endif
+#endif
+            osg::ref_ptr<osg::Group> window_root;
 
         private:
             //holds the scene
@@ -520,8 +533,11 @@ namespace vizkit3d
 
             osg::ref_ptr<osg::Referenced> captureHandler;
             osg::ref_ptr<osg::Referenced> captureOperation;
+#ifndef HAVE_OSGQOPENGL
             osg::ref_ptr<osgQt::GraphicsWindowQt> graphicsWindowQt;
-            osg::ref_ptr<osg::GraphicsContext> graphicsWindowQtgc;
+#else
+            osgQOpenGLWidget *openGLWidget;//Descendant of QObject
+#endif
             osg::ref_ptr<osg::CullFace> cullFace;
 
             std::shared_ptr<osgviz::ManipulationClickHandler> clickHandler;

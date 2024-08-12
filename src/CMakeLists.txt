@@ -141,16 +141,19 @@ if (ROCK_QT_VERSION_5)
         message(SEND_ERROR "Could not find QtPropertyBrowser or QtPropertyBrowser-qt5")
     endif()
 
-pkg_check_modules(OSGQT QUIET osgQt)
-pkg_check_modules(OPENSCENEGRAPH_OSGQT5 QUIET openscenegraph-osgQt5)
+    pkg_check_modules(OSGQT QUIET osgQt)
+    pkg_check_modules(OPENSCENEGRAPH_OSGQT5 QUIET openscenegraph-osgQt5)
+    pkg_check_modules(OSGQOPENGL QUIET openscenegraph-osgQOpenGL)
 
-if(${OPENSCENEGRAPH_OSGQT5_FOUND})
-  set(OSGQT_PKGCONFIG_NAME "openscenegraph-osgQt5")
-elseif(${OSGQT_FOUND})
-  set(OSGQT_PKGCONFIG_NAME "osgQt")
-else()
-  message(SEND_ERROR "Could not find osgQt or openscenegraph-osgQt5 with pkg-config")
-endif()
+    if(OSGQOPENGL_FOUND)
+        set(OSGQT_PKGCONFIG_NAME "openscenegraph-osgQOpenGL")
+    elseif(OPENSCENEGRAPH_OSGQT5_FOUND)
+        set(OSGQT_PKGCONFIG_NAME "openscenegraph-osgQt5")
+    elseif(${OSGQT_FOUND})
+        set(OSGQT_PKGCONFIG_NAME "osgQt")
+    else()
+        message(SEND_ERROR "Could not find osgQt, openscenegraph-osgQt5 or osgQOpenGL with pkg-config")
+    endif()
 
 rock_library(vizkit3d-qt5
     SOURCES
@@ -181,6 +184,10 @@ rock_library(vizkit3d-qt5
         ${OSGQT_PKGCONFIG_NAME}
         ManipulationClickHandler
 )
+
+    if(OSGQOPENGL_FOUND)
+        target_compile_definitions(vizkit3d-qt5 PRIVATE HAVE_OSGQOPENGL)
+    endif()
 
 rock_library(vizkitwidgetloader-qt5
     SOURCES
